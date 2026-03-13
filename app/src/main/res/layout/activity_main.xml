@@ -1,24 +1,5 @@
-<!--<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"-->
-<!--    android:layout_width="match_parent"-->
-<!--    android:layout_height="match_parent">-->
-
-<!--    <androidx.camera.view.PreviewView-->
-<!--        android:id="@+id/viewFinder"-->
-<!--        android:layout_width="match_parent"-->
-<!--        android:layout_height="match_parent" />-->
-
-<!--    <Button-->
-<!--        android:id="@+id/btnCapture"-->
-<!--        android:layout_width="wrap_content"-->
-<!--        android:layout_height="wrap_content"-->
-<!--        android:layout_alignParentBottom="true"-->
-<!--        android:layout_centerHorizontal="true"-->
-<!--        android:layout_marginBottom="50dp"-->
-<!--        android:text="Scan Fine Print"-->
-<!--        android:backgroundTint="#FF0000" />-->
-<!--</RelativeLayout>-->
-
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
@@ -38,22 +19,32 @@
         android:textSize="12sp"
         android:backgroundTint="#757575" />
 
-    <ScrollView
+    <androidx.cardview.widget.CardView
+        android:id="@+id/resultCard"
         android:layout_width="match_parent"
-        android:layout_height="250dp"
+        android:layout_height="wrap_content"
         android:layout_above="@+id/btnCapture"
         android:layout_margin="16dp"
-        android:background="#CC000000"
-        android:padding="10dp">
+        app:cardBackgroundColor="#F5F5F5"
+        app:cardCornerRadius="12dp"
+        app:cardElevation="8dp">
 
-        <TextView
-            android:id="@+id/txtResults"
+        <ScrollView
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Point camera at a contract and tap 'Scan'..."
-            android:textColor="#FFFFFF"
-            android:textSize="16sp" />
-    </ScrollView>
+            android:layout_height="350dp"
+            android:padding="12dp">
+
+            <TextView
+                android:id="@+id/txtResults"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Point camera at a contract and tap 'Scan'..."
+                android:textColor="#333333"
+                android:textSize="16sp"
+                android:lineSpacingExtra="4sp"
+                android:fontFamily="sans-serif-medium" />
+        </ScrollView>
+    </androidx.cardview.widget.CardView>
 
     <Button
         android:id="@+id/btnCapture"
@@ -63,6 +54,9 @@
         android:layout_centerHorizontal="true"
         android:layout_marginBottom="30dp"
         android:text="Scan Fine Print"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp"
+        android:textSize="16sp"
         android:backgroundTint="#4CAF50" />
 
 </RelativeLayout>

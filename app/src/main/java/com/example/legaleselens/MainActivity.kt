@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Bundle
+import android.text.Html
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
@@ -124,35 +125,47 @@ class MainActivity : AppCompatActivity() {
 
     private fun compareContracts() {
         val resultTextView = findViewById<TextView>(R.id.txtResults)
-        val prompt = "Compare these two contracts and highlight risks/differences:\n\nDOC A: $contractOneText\n\nDOC B: $contractTwoText"
+        val prompt = """
+            Compare these two contracts and highlight risks/differences.
+            Format your response clearly using the following structure:
+            1. 🔍 SUMMARY: A 2-sentence overview of the main difference.
+            2. ⚠️ HIGH RISKS: Use emojis and bullet points for dangerous clauses.
+            3. 💰 FINANCIALS: Clear comparison of costs, fees, or penalties.
+            4. ✅ RECOMMENDATION: One clear piece of advice.
+            
+            Keep it concise and easy to read on a mobile screen.
+            
+            DOC A: $contractOneText
+            DOC B: $contractTwoText
+        """.trimIndent()
 
         MainScope().launch {
-            // Trying potential IDs from your list in order of stability
             val modelIdsToTry = listOf(
-                "gemini-1.5-flash",        // Standard ID for "Gemini Flash Latest"
-                "gemini-2.0-flash",        // ID from your list
-                "gemini-flash-lite-latest", // ID from your list
-                "gemini-1.5-flash-8b",     // High availability Lite version
-                "gemini-2.0-flash-lite"    // Another ID from your list
+                "gemini-1.5-flash",
+                "gemini-2.0-flash",
+                "gemini-flash-lite-latest",
+                "gemini-1.5-flash-8b",
+                "gemini-2.0-flash-lite"
             )
 
-            val errors = StringBuilder()
-            
             for (modelId in modelIdsToTry) {
                 try {
                     val model = GenerativeModel(modelId, GEMINI_API_KEY)
                     val response = model.generateContent(prompt)
-                    resultTextView.text = response.text
-                    return@launch // SUCCESS! Exit the loop and the coroutine
+                    val rawText = response.text ?: ""
+                    
+                    // Simple Markdown-to-HTML conversion for bolding
+                    val formattedText = rawText
+                        .replace(Regex("\\*\\*(.*?)\\*\\*"), "<b>$1</b>")
+                        .replace("\n", "<br>")
+                    
+                    resultTextView.text = Html.fromHtml(formattedText, Html.FROM_HTML_MODE_COMPACT)
+                    return@launch
                 } catch (e: Exception) {
-                    val msg = e.message ?: "Unknown error"
-                    // If it's a 404, we just log it and move to next. If it's quota (429), it might be worth mentioning.
-                    errors.append("- $modelId: ${if (msg.contains("404")) "Not Found" else msg}\n")
+                    // Continue to next model
                 }
             }
-
-            // If we get here, ALL models failed
-            resultTextView.text = "Comparison failed for all models.\n\nDetails:\n$errors"
+            resultTextView.text = "Comparison failed. Please check your internet or API quota."
         }
     }
 }
