@@ -99,34 +99,33 @@ class MainActivity : ComponentActivity() {
 fun parseMarkdownToAnnotatedString(text: String, primaryColor: Color, errorColor: Color): AnnotatedString {
     return buildAnnotatedString {
         val lines = text.split("\n")
-        for (line in lines) {
+        for ((index, line) in lines.withIndex()) {
             when {
                 line.startsWith("### ") -> {
                     withStyle(style = SpanStyle(fontSize = 20.sp, fontWeight = FontWeight.Bold, color = primaryColor)) {
-                        append(line.removePrefix("### ") + "\n")
+                        append(line.removePrefix("### "))
                     }
                 }
                 line.startsWith("## ") -> {
                     withStyle(style = SpanStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold, color = primaryColor)) {
-                        append(line.removePrefix("## ") + "\n")
+                        append(line.removePrefix("## "))
                     }
                 }
                 line.startsWith("# ") -> {
                     withStyle(style = SpanStyle(fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = primaryColor)) {
-                        append(line.removePrefix("# ") + "\n")
+                        append(line.removePrefix("# "))
                     }
                 }
                 line.startsWith("- ") || line.startsWith("* ") -> {
                     append("• ")
                     val content = line.substring(2)
                     parseInlineMarkdown(content, errorColor)
-                    append("\n")
                 }
                 else -> {
                     parseInlineMarkdown(line, errorColor)
-                    append("\n")
                 }
             }
+            if (index < lines.size - 1) append("\n")
         }
     }
 }
@@ -150,6 +149,116 @@ fun AnnotatedString.Builder.parseInlineMarkdown(text: String, errorColor: Color)
     }
     if (currentIndex < text.length) {
         append(text.substring(currentIndex))
+    }
+}
+
+sealed class MarkdownBlock {
+    data class TextBlock(val text: String) : MarkdownBlock()
+    data class TableBlock(val rows: List<List<String>>) : MarkdownBlock()
+}
+
+fun parseMarkdownBlocks(text: String): List<MarkdownBlock> {
+    val blocks = mutableListOf<MarkdownBlock>()
+    val lines = text.split("\n")
+    val currentText = StringBuilder()
+    val currentTable = mutableListOf<List<String>>()
+
+    for (line in lines) {
+        val trimmed = line.trim()
+        val isTableRow = trimmed.startsWith("|") && trimmed.endsWith("|")
+        if (isTableRow) {
+            if (currentText.isNotEmpty()) {
+                blocks.add(MarkdownBlock.TextBlock(currentText.toString()))
+                currentText.clear()
+            }
+            val cells = trimmed.drop(1).dropLast(1).split("|").map { it.trim() }
+            currentTable.add(cells)
+        } else {
+            if (currentTable.isNotEmpty()) {
+                blocks.add(MarkdownBlock.TableBlock(currentTable.toList()))
+                currentTable.clear()
+            }
+            currentText.append(line).append("\n")
+        }
+    }
+    if (currentText.isNotEmpty()) {
+        blocks.add(MarkdownBlock.TextBlock(currentText.toString()))
+    }
+    if (currentTable.isNotEmpty()) {
+        blocks.add(MarkdownBlock.TableBlock(currentTable.toList()))
+    }
+    return blocks
+}
+
+@Composable
+fun MarkdownViewer(text: String, primaryColor: Color, errorColor: Color, modifier: Modifier = Modifier) {
+    val blocks = remember(text) { parseMarkdownBlocks(text) }
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        blocks.forEach { block ->
+            when (block) {
+                is MarkdownBlock.TextBlock -> {
+                    if (block.text.isNotBlank()) {
+                        Text(
+                            text = parseMarkdownToAnnotatedString(block.text.trimEnd(), primaryColor, errorColor),
+                            style = MaterialTheme.typography.bodyLarge,
+                            lineHeight = 24.sp,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                    }
+                }
+                is MarkdownBlock.TableBlock -> {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Column {
+                            block.rows.forEachIndexed { index, row ->
+                                val isSeparator = row.all { it.replace("-", "").replace(":", "").isBlank() }
+                                if (!isSeparator) {
+                                    val isHeader = index == 0
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(if (isHeader) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color.Transparent)
+                                            .padding(8.dp)
+                                    ) {
+                                        row.forEach { cell ->
+                                            Text(
+                                                text = parseMarkdownToAnnotatedString(cell, primaryColor, errorColor),
+                                                fontWeight = if (isHeader) FontWeight.Bold else FontWeight.Normal,
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .padding(4.dp),
+                                                style = MaterialTheme.typography.bodyMedium
+                                            )
+                                        }
+                                    }
+                                    if (isHeader) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(1.dp)
+                                                .background(primaryColor.copy(alpha = 0.5f))
+                                        )
+                                    } else if (index < block.rows.size - 1) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(1.dp)
+                                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -279,7 +388,7 @@ fun LegaleseLensApp(apiKey: String) {
                         List 2-3 risks, loopholes, or dangerous clauses. Use emojis.
                         
                         ### 💰 FINANCIALS
-                        Clear explanation of any costs, fees, or penalties mentioned.
+                        Clear explanation of any costs, fees, or penalties mentioned. Format this as a Markdown table (e.g., | Item | Details |).
                         
                         ### 💡 RECOMMENDATION
                         One clear piece of advice before signing or agreeing.
@@ -344,7 +453,7 @@ fun LegaleseLensApp(apiKey: String) {
                     Use bullet points for dangerous clauses.
                     
                     ### 💰 FINANCIALS
-                    Clear comparison of costs, fees, or penalties.
+                    Clear comparison of costs, fees, or penalties in a Markdown table format (e.g., | Feature | DOC A | DOC B |).
                     
                     ### ✅ RECOMMENDATION
                     One clear piece of advice.
@@ -901,10 +1010,10 @@ fun CameraScanScreen(
                                                 )
                                                 .padding(16.dp)
                                         ) {
-                                            Text(
-                                                text = parseMarkdownToAnnotatedString(comparisonResult ?: "No results", MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.error),
-                                                style = MaterialTheme.typography.bodyLarge,
-                                                lineHeight = 24.sp
+                                            MarkdownViewer(
+                                                text = comparisonResult ?: "No results",
+                                                primaryColor = MaterialTheme.colorScheme.primary,
+                                                errorColor = MaterialTheme.colorScheme.error
                                             )
                                         }
                                         
@@ -1071,10 +1180,10 @@ fun HistoryDetailScreen(item: HistoryItem?, onBack: () -> Unit) {
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
-                Text(
-                    text = parseMarkdownToAnnotatedString(item.fullText, MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.error),
-                    style = MaterialTheme.typography.bodyLarge,
-                    lineHeight = 24.sp
+                MarkdownViewer(
+                    text = item.fullText,
+                    primaryColor = MaterialTheme.colorScheme.primary,
+                    errorColor = MaterialTheme.colorScheme.error
                 )
             } else {
                 Text("Item details not found.")
